@@ -16,6 +16,9 @@ export function ReportView({
   const { totals, bank } = report;
   const avg =
     totals.daysWorked > 0 ? Math.round(totals.minutes / totals.daysWorked) : 0;
+  const hasPlaceChecks = report.rows.some((r) =>
+    Object.values(r.byType).some((p) => p.locationCheck),
+  );
 
   return (
     <div className="space-y-4">
@@ -63,6 +66,8 @@ export function ReportView({
         {totals.manualPunches > 0 && ` Neste mês: ${totals.manualPunches} lançamento(s) manual(is).`}
         {bank &&
           ` Banco de horas desde ${formatDateBR(bank.since)}: diferenças de até ${TOLERANCE_MINUTES} minutos no dia não contam; o dia de hoje entra depois da saída, e dias com batida faltando ficam fora do saldo.`}
+        {hasPlaceChecks &&
+          " Local: “GPS” = confirmada pela localização; “!” = fora da loja ou local não confirmado; sem marca = rede da loja ou batida sem conferência."}
       </p>
 
       <div className="hidden grid-cols-2 gap-10 pt-16 text-center text-xs print:grid">

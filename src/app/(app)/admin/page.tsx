@@ -4,6 +4,7 @@ import { cardClass } from "@/components/ui";
 import { db } from "@/db";
 import { punches, users, type Punch, type PunchType } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
+import { describePlace } from "@/lib/location";
 import { PUNCH_ORDER, PUNCH_SHORT } from "@/lib/punches";
 import { formatTime, longDateLabel, workDateOf } from "@/lib/time";
 
@@ -28,6 +29,19 @@ function statusOf(byType: Partial<Record<PunchType, Punch>>): Status {
   if (byType.LUNCH_OUT && !byType.LUNCH_IN) return "lunch";
   if (byType.ENTRY || byType.LUNCH_IN) return "working";
   return "absent";
+}
+
+/** Aviso embaixo do horário quando a batida não foi confirmada na loja. */
+function PlaceWarning({ punch }: { punch: Punch | undefined }) {
+  const check = punch?.locationCheck;
+  if (check !== "OUTSIDE" && check !== "UNCONFIRMED") return null;
+  return (
+    <span
+      className={`mt-0.5 block text-xs font-medium ${check === "OUTSIDE" ? "text-red-700" : "text-amber-700"}`}
+    >
+      {describePlace(check, punch!.distanceMeters)}
+    </span>
+  );
 }
 
 export default async function AdminHome() {
@@ -95,6 +109,7 @@ export default async function AdminHome() {
                   {PUNCH_ORDER.map((t) => (
                     <td key={t} className="px-3 py-2.5 text-center tabular-nums">
                       {r.byType[t] ? formatTime(r.byType[t]!.at) : <span className="text-slate-300">—</span>}
+                      <PlaceWarning punch={r.byType[t]} />
                     </td>
                   ))}
                   <td className="px-3 py-2.5">

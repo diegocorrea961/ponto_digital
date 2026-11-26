@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   date,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -28,6 +29,15 @@ export const punchSourceEnum = pgEnum("punch_source", ["CLOCK", "MANUAL"]);
 // HOLIDAY: feriado ou folga (não se espera trabalho; o que for trabalhado vira hora extra).
 // EXCUSED: atestado ou abono (nunca gera débito; só vira extra o que passar da jornada normal).
 export const dayOffKindEnum = pgEnum("day_off_kind", ["HOLIDAY", "EXCUSED"]);
+
+// Como o local de uma batida foi conferido. Nenhum resultado bloqueia a batida:
+// OUTSIDE e UNCONFIRMED só geram aviso.
+export const locationCheckEnum = pgEnum("location_check", [
+  "NETWORK", // veio da rede (internet) da loja
+  "GPS", // fora da rede, mas o GPS confirmou que estava na loja
+  "OUTSIDE", // o GPS indica que estava fora
+  "UNCONFIRMED", // fora da rede e sem GPS confiável
+]);
 
 /** Jornada de um dia da semana. Horários no formato "09:00"; null = não é fixo. */
 export type DaySchedule = {
@@ -91,6 +101,11 @@ export const punches = pgTable(
     // Justificativa (obrigatória nos ajustes manuais).
     note: text("note"),
     createdById: uuid("created_by_id"),
+    // Conferência de local (null: batida manual ou conferência não configurada).
+    // Guardamos só a distância até a loja e a precisão, nunca as coordenadas da pessoa.
+    locationCheck: locationCheckEnum("location_check"),
+    distanceMeters: integer("distance_meters"),
+    accuracyMeters: integer("accuracy_meters"),
     // Batidas nunca são apagadas: ficam "anuladas" com motivo, para auditoria.
     voidedAt: timestamp("voided_at", { withTimezone: true }),
     voidReason: text("void_reason"),
@@ -153,6 +168,21 @@ export const dayOffs = pgTable(
   (t) => [index("day_offs_user_idx").on(t.userId, t.startDate)],
 );
 
+// Onde fica a loja. Uma linha só (id = 1).
+export const storeSettings = pgTable("store_settings", {
+  id: integer("id").primaryKey().default(1),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
+  radiusMeters: integer("radius_meters").notNull().default(100),
+  // Redes de internet da loja: endereço IPv4, ou o prefixo /64 de um IPv6.
+  networks: jsonb("networks").$type<string[]>().notNull().default([]),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedById: uuid("updated_by_id"),
+});
+
+export type LocationCheck = (typeof locationCheckEnum.enumValues)[number];
 export type DayOff = typeof dayOffs.$inferSelect;
 export type DayOffKind = (typeof dayOffKindEnum.enumValues)[number];
 export type User = typeof users.$inferSelect;

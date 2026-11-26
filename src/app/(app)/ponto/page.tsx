@@ -4,6 +4,7 @@ import { cardClass } from "@/components/ui";
 import { db } from "@/db";
 import { punches } from "@/db/schema";
 import { requireEmployee } from "@/lib/auth";
+import { storeCoords } from "@/lib/location";
 import {
   nextPunchType,
   PUNCH_ACTION,
@@ -11,6 +12,7 @@ import {
   PUNCH_ORDER,
   PUNCH_SHORT,
 } from "@/lib/punches";
+import { getStoreSettings } from "@/lib/store";
 import { formatTime, longDateLabel, workDateOf } from "@/lib/time";
 import { PunchForm } from "./punch-form";
 
@@ -32,6 +34,7 @@ export default async function PunchPage() {
     .orderBy(asc(punches.at));
 
   const next = nextPunchType(todays);
+  const usesLocation = storeCoords(await getStoreSettings()) !== null;
   const byType = new Map(todays.map((p) => [p.type, p]));
   const firstName = user.name.split(" ")[0];
   const hour = Number(formatTime(now).slice(0, 2));
@@ -52,6 +55,7 @@ export default async function PunchPage() {
           next={next}
           actionLabel={next ? PUNCH_ACTION[next] : ""}
           punchLabel={next ? PUNCH_LABEL[next] : ""}
+          usesLocation={usesLocation}
         />
       </div>
 

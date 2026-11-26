@@ -1,4 +1,6 @@
 // Avisos de cada dia, usados pela tabela da tela/impressão e pela planilha CSV.
+import { describePlace } from "./location";
+import { PUNCH_ORDER, PUNCH_SHORT } from "./punches";
 import type { DayRow } from "./report";
 import { DAY_OFF_LABEL } from "./schedule";
 import { formatDuration } from "./time";
@@ -24,5 +26,15 @@ export function dayBadges(row: DayRow, today: string): DayBadge[] {
     badges.push({ text: `Atraso na volta do almoço: ${row.lateLunch} min`, tone: "warn" });
   }
   if (row.outsideStoreHours) badges.push({ text: "Fora do horário da loja", tone: "warn" });
+  for (const type of PUNCH_ORDER) {
+    const punch = row.byType[type];
+    const check = punch?.locationCheck;
+    if (check === "OUTSIDE" || check === "UNCONFIRMED") {
+      badges.push({
+        text: `${PUNCH_SHORT[type]}: ${describePlace(check, punch!.distanceMeters)}`,
+        tone: check === "OUTSIDE" ? "bad" : "warn",
+      });
+    }
+  }
   return badges;
 }

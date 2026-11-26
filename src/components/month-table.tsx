@@ -1,3 +1,4 @@
+import { describePlace } from "@/lib/location";
 import { PUNCH_LABEL, PUNCH_ORDER, PUNCH_SHORT } from "@/lib/punches";
 import type { DayRow, MonthReport } from "@/lib/report";
 import { dayBadges } from "@/lib/report-labels";
@@ -40,7 +41,9 @@ export function MonthTable({
             const cells = {} as Record<PunchType, Cell>;
             for (const t of PUNCH_ORDER) {
               const p = r.byType[t];
-              cells[t] = p ? { time: formatTime(p.at), manual: p.source === "MANUAL" } : null;
+              cells[t] = p
+                ? { time: formatTime(p.at), manual: p.source === "MANUAL", place: p.locationCheck }
+                : null;
             }
 
             const notes = r.all
@@ -77,6 +80,7 @@ export function MonthTable({
                   label: PUNCH_LABEL[p.type],
                   time: formatTime(p.at),
                   manual: p.source === "MANUAL",
+                  place: p.locationCheck && describePlace(p.locationCheck, p.distanceMeters),
                   note: p.note,
                   voided: Boolean(p.voidedAt),
                   voidReason: p.voidReason,

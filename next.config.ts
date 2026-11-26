@@ -27,7 +27,8 @@ const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" }, // reforço do frame-ancestors para navegadores antigos
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+    // geolocation=(self): só o próprio sistema pode pedir a localização (usada ao bater o ponto).
+    value: "camera=(), microphone=(), geolocation=(self), payment=(), usb=()",
   },
   // HSTS: o navegador passa a abrir o site sempre por https. Só em produção.
   ...(isDev

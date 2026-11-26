@@ -43,6 +43,7 @@ export default async function AppLayout({
                 </NavLink>
                 <NavLink href="/admin/funcionarios">Funcionários</NavLink>
                 <NavLink href="/admin/relatorios">Relatórios</NavLink>
+                <NavLink href="/admin/loja">Loja</NavLink>
               </>
             ) : (
               <>

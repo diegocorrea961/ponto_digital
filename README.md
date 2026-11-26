@@ -34,6 +34,33 @@ Como o saldo é calculado:
 
 Banco de horas tem regras trabalhistas próprias (acordo por escrito e prazo para compensar). Confirme com o contador antes de usar o saldo para pagar ou descontar.
 
+## Local da batida (rede da loja + GPS)
+
+Serve para avisar quando o ponto é batido fora da loja. **Nenhuma batida é bloqueada.**
+
+Configure em **Loja** (só administradora), de preferência dentro da loja:
+
+1. **Adicionar a rede em que estou:** cadastra a internet da loja. Vale para o computador e para o celular no Wi-Fi de lá.
+2. **Localização (reserva):** usada quando a batida vem de fora dessa rede, como um celular no 4G. Raio padrão de 100 m.
+
+| Situação | Resultado |
+|---|---|
+| Veio da rede da loja | Confirmada (o GPS nem é pedido) |
+| Fora da rede, GPS dentro do raio com precisão de até 150 m | Confirmada, marcada com **GPS** |
+| Fora da rede, GPS fora do raio mesmo com a margem de erro | Aviso **Fora da loja** com a distância |
+| Fora da rede, sem permissão, sem GPS ou com precisão ruim | Aviso **Local não confirmado** |
+
+Os avisos aparecem para a funcionária, no painel "Hoje", no relatório e no CSV. A batida é gravada antes de o GPS responder; o GPS só pode ser anexado uma vez, em até 2 minutos. Guardamos a distância e a precisão, **não as coordenadas**.
+
+Cuidados:
+
+- A conferência pela rede só faz sentido no **site publicado**. Rodando no seu computador, os IPs são da rede local.
+- Se a operadora mudar o IP da loja, adicione a rede de novo. Até lá, as batidas caem na conferência por GPS.
+- Algumas operadoras compartilham o mesmo IP entre vários clientes (CGNAT). Alguém em casa, com a mesma operadora, poderia em casos raros aparecer como "rede da loja".
+- Aplicativos de GPS falso conseguem enganar a conferência por GPS. Ela inibe, mas não prova presença.
+- O GPS exige HTTPS (Vercel ou `localhost`).
+- Localização é dado pessoal (LGPD): avise a funcionária de que ela é lida no momento da batida.
+
 ## Stack
 
 Next.js 16 (App Router) + TypeScript + Tailwind 4 + PostgreSQL + Drizzle ORM. O login usa cookie assinado (`jose`) e senhas com `bcryptjs`.
@@ -88,6 +115,7 @@ O controle de ponto é obrigatório para estabelecimentos com **mais de 20 funci
 ```
 src/db/schema.ts            tabelas: users, punches, work_schedules, day_offs, login_attempts
 src/lib/schedule.ts         regras da jornada e do banco de horas
+src/lib/location.ts         regras da conferência de local (network.ts: rede de origem)
 src/lib/time.ts             tudo que mexe com data/hora no fuso de São Paulo
 src/lib/punches.ts          ordem das 4 batidas, próximo tipo, cálculo de horas trabalhadas
 src/lib/report.ts           monta o relatório do mês (uma linha por dia)
@@ -102,6 +130,5 @@ drizzle/                    migrations SQL
 ## Ideias para depois
 
 - Registrar o pagamento de horas extras (baixa no saldo do banco).
-- Restringir a batida à rede wi-fi ou à localização da loja.
 - Feriado lançado de uma vez para todos os funcionários.
 - Aviso para a administradora quando alguém esquece a saída.

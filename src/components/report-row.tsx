@@ -6,19 +6,21 @@ import {
   voidPunchAction,
 } from "@/app/(app)/admin/actions";
 import { addDayOffAction, removeDayOffAction } from "@/app/(app)/admin/schedule-actions";
-import type { PunchType } from "@/db/schema";
+import type { LocationCheck, PunchType } from "@/db/schema";
 import type { DayBadge } from "@/lib/report-labels";
 import { FormMessage } from "./form-message";
 import { SubmitButton } from "./submit-button";
 import { inputClass } from "./ui";
 
-export type Cell = { time: string; manual: boolean } | null;
+export type Cell = { time: string; manual: boolean; place: LocationCheck | null } | null;
 
 export type AdjustPunch = {
   id: string;
   label: string;
   time: string;
   manual: boolean;
+  /** "Confirmada pela rede da loja", "Fora da loja (2,3 km)"… */
+  place: string | null;
   note: string | null;
   voided: boolean;
   voidReason: string | null;
@@ -84,6 +86,17 @@ export function ReportRow({
                 <span title={cell.manual ? "Lançada manualmente pelo administrador" : undefined}>
                   {cell.time}
                   {cell.manual && <sup className="ml-0.5 text-sky-700">*</sup>}
+                  {cell.place === "GPS" && (
+                    <sup className="ml-0.5 text-[10px] font-semibold text-slate-500">GPS</sup>
+                  )}
+                  {(cell.place === "OUTSIDE" || cell.place === "UNCONFIRMED") && (
+                    <sup
+                      className={`ml-0.5 font-bold ${cell.place === "OUTSIDE" ? "text-red-700" : "text-amber-700"}`}
+                      title={cell.place === "OUTSIDE" ? "Fora da loja" : "Local não confirmado"}
+                    >
+                      !
+                    </sup>
+                  )}
                 </span>
               ) : (
                 <span className="text-slate-300">—</span>
@@ -156,6 +169,7 @@ function AdjustPanel({ date, adjust }: { date: string; adjust: AdjustData }) {
                   {p.label}: {p.time}
                   {p.manual && " (manual)"}
                 </p>
+                {p.place && <p className="text-xs text-slate-500">{p.place}</p>}
                 {p.note && <p className="text-xs text-slate-500">Motivo do lançamento: {p.note}</p>}
                 {p.voided ? (
                   <p className="text-xs text-red-700">Anulada. Motivo: {p.voidReason}</p>

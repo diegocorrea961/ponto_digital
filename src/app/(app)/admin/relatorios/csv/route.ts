@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
+import { describePlace } from "@/lib/location";
 import { PUNCH_ORDER, PUNCH_SHORT } from "@/lib/punches";
 import { getMonthReport } from "@/lib/report";
 import { dayBadges } from "@/lib/report-labels";
@@ -50,6 +51,13 @@ export async function GET(req: NextRequest) {
   for (const r of report.rows) {
     const notes = [
       ...dayBadges(r, today).map((b) => b.text),
+      // Os avisos de local já vêm acima; aqui entram as batidas confirmadas por GPS.
+      ...PUNCH_ORDER.flatMap((t) => {
+        const p = r.byType[t];
+        return p?.locationCheck === "GPS"
+          ? [`${PUNCH_SHORT[t]}: ${describePlace("GPS", p.distanceMeters)}`]
+          : [];
+      }),
       ...r.all
         .filter((p) => !p.voidedAt && p.source === "MANUAL")
         .map((p) => `${PUNCH_SHORT[p.type]} lançada manualmente${p.note ? `: ${p.note}` : ""}`),
