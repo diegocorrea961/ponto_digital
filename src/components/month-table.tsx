@@ -1,6 +1,8 @@
 import { PUNCH_LABEL, PUNCH_ORDER, PUNCH_SHORT } from "@/lib/punches";
-import type { MonthReport } from "@/lib/report";
-import { formatDuration, formatTime, workDateOf } from "@/lib/time";
+import type { DayRow, MonthReport } from "@/lib/report";
+import { dayBadges } from "@/lib/report-labels";
+import { DAY_OFF_LABEL } from "@/lib/schedule";
+import { formatBalance, formatDateBR, formatDuration, formatTime, workDateOf } from "@/lib/time";
 import type { PunchType } from "@/db/schema";
 import { ReportRow, type AdjustData, type Cell, type RowData } from "./report-row";
 
@@ -13,10 +15,11 @@ export function MonthTable({
   editable?: boolean;
 }) {
   const today = workDateOf(new Date());
+  const { bank } = report;
 
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white print:overflow-visible print:rounded-none print:border-slate-400">
-      <table className="w-full min-w-[640px] text-sm print:min-w-0">
+      <table className={`w-full text-sm print:min-w-0 ${bank ? "min-w-[800px]" : "min-w-[640px]"}`}>
         <thead className="bg-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 print:bg-transparent">
           <tr>
             <th className="px-3 py-2">Dia</th>
@@ -26,6 +29,8 @@ export function MonthTable({
               </th>
             ))}
             <th className="px-3 py-2 text-center">Total</th>
+            {bank && <th className="px-3 py-2 text-center">Previsto</th>}
+            {bank && <th className="px-3 py-2 text-center">Saldo</th>}
             <th className="px-3 py-2">Observações</th>
             {editable && <th className="px-3 py-2 print:hidden" aria-label="Ajustes" />}
           </tr>
@@ -42,18 +47,18 @@ export function MonthTable({
               .filter((p) => !p.voidedAt && p.source === "MANUAL")
               .map((p) => `${PUNCH_SHORT[p.type]} lançada manualmente${p.note ? `: ${p.note}` : ""}`);
 
+            // Dia sem trabalho previsto fica esmaecido (sem jornada: domingo).
+            const rest = r.expected !== null ? !r.isWorkDay : r.weekday === 0;
+
             const row: RowData = {
               date: r.date,
               day: r.date.slice(8),
               weekday: weekdayLabel(r.weekday),
-              muted: (r.weekday === 0 || r.isFuture) && !r.hasPunches,
+              muted: (rest || r.isFuture) && !r.hasPunches,
               cells,
               total: r.hasPunches ? formatDuration(r.minutes) : null,
-              status: !r.hasPunches
-                ? "empty"
-                : !r.complete && r.date !== today
-                  ? "incomplete"
-                  : "ok",
+              bank: bank ? bankCells(r) : null,
+              badges: dayBadges(r, today),
               notes,
             };
 
@@ -65,6 +70,7 @@ export function MonthTable({
               }));
               adjust = {
                 userId: report.user.id,
+                isFuture: r.isFuture,
                 missing: r.isFuture ? [] : missing,
                 punches: r.all.map((p) => ({
                   id: p.id,
@@ -75,6 +81,17 @@ export function MonthTable({
                   voided: Boolean(p.voidedAt),
                   voidReason: p.voidReason,
                 })),
+                dayOff: r.dayOff
+                  ? {
+                      id: r.dayOff.id,
+                      label: DAY_OFF_LABEL[r.dayOff.kind],
+                      reason: r.dayOff.reason,
+                      period:
+                        r.dayOff.startDate === r.dayOff.endDate
+                          ? null
+                          : `${formatDateBR(r.dayOff.startDate)} a ${formatDateBR(r.dayOff.endDate)}`,
+                    }
+                  : null,
               };
             }
 
@@ -90,12 +107,34 @@ export function MonthTable({
             <td className="px-3 py-3 text-center tabular-nums">
               {formatDuration(report.totals.minutes)}
             </td>
+            {bank && (
+              <td className="px-3 py-3 text-center tabular-nums">
+                {formatDuration(bank.expectedMinutes)}
+              </td>
+            )}
+            {bank && (
+              <td className="px-3 py-3 text-center tabular-nums">{formatBalance(bank.month)}</td>
+            )}
             <td className="px-3 py-3" colSpan={editable ? 2 : 1} />
           </tr>
         </tfoot>
       </table>
     </div>
   );
+}
+
+function bankCells(r: DayRow): NonNullable<RowData["bank"]> {
+  const expected = r.expected ? formatDuration(r.expected) : r.expected === 0 ? "—" : "";
+  if (r.balance === null) {
+    return { expected, balance: r.pending ? "pendente" : "", tone: "zero" };
+  }
+  // Dia sem previsão e sem saldo não precisa mostrar "0h00".
+  const quiet = r.balance === 0 && !r.expected && !r.hasPunches;
+  return {
+    expected,
+    balance: quiet ? "—" : formatBalance(r.balance),
+    tone: r.balance > 0 ? "pos" : r.balance < 0 ? "neg" : "zero",
+  };
 }
 
 const WEEKDAYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];

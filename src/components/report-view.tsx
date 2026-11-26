@@ -1,5 +1,6 @@
-import type { MonthReport } from "@/lib/report";
-import { formatDuration, formatDateBR, monthLabel, workDateOf } from "@/lib/time";
+import type { BankSummary, MonthReport } from "@/lib/report";
+import { TOLERANCE_MINUTES } from "@/lib/schedule";
+import { formatBalance, formatDuration, formatDateBR, monthLabel, workDateOf } from "@/lib/time";
 import { MonthTable } from "./month-table";
 
 /** Espelho de ponto do mês: cabeçalho de impressão, resumo, tabela e linhas de assinatura. */
@@ -12,7 +13,7 @@ export function ReportView({
   storeName: string;
   editable?: boolean;
 }) {
-  const { totals } = report;
+  const { totals, bank } = report;
   const avg =
     totals.daysWorked > 0 ? Math.round(totals.minutes / totals.daysWorked) : 0;
 
@@ -42,6 +43,17 @@ export function ReportView({
         />
       </dl>
 
+      {bank ? (
+        <BankPanel bank={bank} />
+      ) : (
+        editable && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 print:hidden">
+            Sem jornada neste período, então não há banco de horas. Cadastre ou ajuste a data de
+            início em Funcionários → Editar.
+          </p>
+        )
+      )}
+
       <MonthTable report={report} editable={editable} />
 
       <p className="text-xs text-slate-500">
@@ -49,6 +61,8 @@ export function ReportView({
         administrador (o motivo aparece em Observações). Os totais descontam o
         intervalo do almoço.
         {totals.manualPunches > 0 && ` Neste mês: ${totals.manualPunches} lançamento(s) manual(is).`}
+        {bank &&
+          ` Banco de horas desde ${formatDateBR(bank.since)}: diferenças de até ${TOLERANCE_MINUTES} minutos no dia não contam; o dia de hoje e dias com batida faltando ficam fora do saldo.`}
       </p>
 
       <div className="hidden grid-cols-2 gap-10 pt-16 text-center text-xs print:grid">
@@ -59,11 +73,41 @@ export function ReportView({
   );
 }
 
+function BankPanel({ bank }: { bank: BankSummary }) {
+  const pending = bank.pendingMonth + bank.pendingPrevious;
+  return (
+    <section aria-label="Banco de horas" className="space-y-2">
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 print:grid-cols-4 print:gap-1">
+        <Stat label="Saldo anterior" value={formatBalance(bank.previous)} />
+        <Stat label="Saldo do mês" value={formatBalance(bank.month)} />
+        <Stat
+          label="Saldo acumulado"
+          value={formatBalance(bank.accumulated)}
+          warn={bank.accumulated < 0}
+        />
+        <Stat
+          label="Faltas / dias com atraso"
+          value={`${bank.absences} / ${bank.lateDays}`}
+          warn={bank.absences > 0}
+        />
+      </dl>
+      {pending > 0 && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 print:bg-transparent print:p-0 print:text-xs">
+          {pending} dia(s) com batida faltando fora do saldo ({bank.pendingMonth} neste mês,{" "}
+          {bank.pendingPrevious} em meses anteriores). Lance as batidas para entrarem na conta.
+        </p>
+      )}
+    </section>
+  );
+}
+
 function Stat({ label, value, warn = false }: { label: string; value: string; warn?: boolean }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <dt className="text-sm text-slate-500">{label}</dt>
-      <dd className={`text-2xl font-semibold tabular-nums ${warn ? "text-amber-700" : ""}`}>
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:rounded-none print:p-1 print:shadow-none">
+      <dt className="text-sm text-slate-500 print:text-xs">{label}</dt>
+      <dd
+        className={`text-2xl font-semibold tabular-nums print:text-sm ${warn ? "text-amber-700" : ""}`}
+      >
         {value}
       </dd>
     </div>

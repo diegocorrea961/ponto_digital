@@ -37,6 +37,28 @@ export function formatDuration(totalMinutes: number): string {
   return `${h}h${String(m).padStart(2, "0")}`;
 }
 
+/** Saldo com sinal: 75 -> "+1h15", -30 -> "-0h30", 0 -> "0h00" */
+export function formatBalance(totalMinutes: number): string {
+  if (totalMinutes === 0) return "0h00";
+  const sign = totalMinutes > 0 ? "+" : "-";
+  return `${sign}${formatDuration(Math.abs(totalMinutes))}`;
+}
+
+/** true só para datas que existem no calendário, no formato "YYYY-MM-DD". */
+export function isRealDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [y, m, d] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+}
+
+/** "2026-11-30" + 1 -> "2026-12-01" */
+export function addDays(dateStr: string, delta: number): string {
+  const d = utcNoon(dateStr);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
 /** "2026-11-26" -> "26/11/2026" */
 export function formatDateBR(dateStr: string): string {
   const [y, m, d] = dateStr.split("-");

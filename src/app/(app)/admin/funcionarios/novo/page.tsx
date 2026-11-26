@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { cardClass } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
+import { workDateOf } from "@/lib/time";
 import { CreateEmployeeForm } from "../../employee-forms";
 
 export default async function NewEmployeePage() {
@@ -14,7 +15,7 @@ export default async function NewEmployeePage() {
         <h1 className="mt-1 text-xl font-semibold">Novo funcionário</h1>
       </div>
       <div className={cardClass}>
-        <CreateEmployeeForm />
+        <CreateEmployeeForm today={workDateOf(new Date())} />
       </div>
     </div>
   );

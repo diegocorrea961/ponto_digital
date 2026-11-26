@@ -10,14 +10,16 @@ import {
   resetPasswordAction,
   updateEmployeeAction,
 } from "./actions";
+import { ScheduleFields } from "./schedule-fields";
 
 const usernameHint =
   "Letras minúsculas sem acento, números, ponto ou hífen. Ex.: maria";
 
-export function CreateEmployeeForm() {
+export function CreateEmployeeForm({ today }: { today: string }) {
   const [state, action] = useActionState(createEmployeeAction, undefined);
   return (
-    <form action={action} className="space-y-4">
+    // onReset: sem isto, um erro do servidor apagaria tudo o que foi digitado.
+    <form action={action} onReset={(e) => e.preventDefault()} className="space-y-4">
       <div>
         <label htmlFor="name" className={labelClass}>
           Nome completo
@@ -57,6 +59,7 @@ export function CreateEmployeeForm() {
           Passe para o funcionário; ele pode trocar depois em &quot;Minha conta&quot;.
         </p>
       </div>
+      <ScheduleFields defaultValidFrom={today} />
       <FormMessage state={state} />
       <SubmitButton pendingText="Cadastrando...">Cadastrar funcionário</SubmitButton>
     </form>

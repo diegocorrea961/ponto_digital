@@ -5,7 +5,9 @@ import {
   addManualPunchAction,
   voidPunchAction,
 } from "@/app/(app)/admin/actions";
+import { addDayOffAction, removeDayOffAction } from "@/app/(app)/admin/schedule-actions";
 import type { PunchType } from "@/db/schema";
+import type { DayBadge } from "@/lib/report-labels";
 import { FormMessage } from "./form-message";
 import { SubmitButton } from "./submit-button";
 import { inputClass } from "./ui";
@@ -24,22 +26,40 @@ export type AdjustPunch = {
 
 export type AdjustData = {
   userId: string;
+  isFuture: boolean;
   punches: AdjustPunch[];
   missing: { value: PunchType; label: string }[];
+  dayOff: {
+    id: string;
+    label: string;
+    reason: string;
+    /** Preenchido quando o abono cobre mais de um dia. */
+    period: string | null;
+  } | null;
 };
 
 export type RowData = {
   date: string; // YYYY-MM-DD
   day: string; // "26"
   weekday: string; // "qui"
-  muted: boolean; // domingo ou dia futuro
+  muted: boolean; // dia sem trabalho previsto ou futuro
   cells: Record<PunchType, Cell>;
   total: string | null;
-  status: "ok" | "incomplete" | "empty";
+  /** null quando o funcionário não tem jornada (colunas Previsto/Saldo escondidas). */
+  bank: { expected: string; balance: string; tone: "pos" | "neg" | "zero" } | null;
+  badges: DayBadge[];
   notes: string[];
 };
 
 const COLUMNS: PunchType[] = ["ENTRY", "LUNCH_OUT", "LUNCH_IN", "EXIT"];
+
+const BADGE_STYLE: Record<DayBadge["tone"], string> = {
+  warn: "bg-amber-100 text-amber-800",
+  bad: "bg-red-100 text-red-800",
+  info: "bg-sky-100 text-sky-800",
+};
+
+const BALANCE_STYLE = { pos: "text-emerald-700", neg: "text-red-700", zero: "text-slate-500" };
 
 export function ReportRow({
   row,
@@ -72,12 +92,25 @@ export function ReportRow({
           );
         })}
         <td className="px-3 py-2 text-center font-medium tabular-nums">{row.total ?? ""}</td>
+        {row.bank && (
+          <>
+            <td className="px-3 py-2 text-center tabular-nums">{row.bank.expected}</td>
+            <td
+              className={`whitespace-nowrap px-3 py-2 text-center font-medium tabular-nums ${BALANCE_STYLE[row.bank.tone]}`}
+            >
+              {row.bank.balance}
+            </td>
+          </>
+        )}
         <td className="px-3 py-2 text-xs">
-          {row.status === "incomplete" && (
-            <span className="mr-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-800 print:bg-transparent print:p-0">
-              Incompleto
+          {row.badges.map((b) => (
+            <span
+              key={b.text}
+              className={`mb-0.5 mr-1 inline-block rounded px-1.5 py-0.5 font-medium print:bg-transparent print:p-0 ${BADGE_STYLE[b.tone]}`}
+            >
+              {b.text}
             </span>
-          )}
+          ))}
           {row.notes.map((n, i) => (
             <span key={i} className="block text-slate-600">
               {n}
@@ -99,7 +132,7 @@ export function ReportRow({
       </tr>
       {adjust && open && (
         <tr className="bg-slate-50 print:hidden">
-          <td colSpan={7} className="px-3 py-4">
+          <td colSpan={row.bank ? 10 : 8} className="px-3 py-4">
             <AdjustPanel date={row.date} adjust={adjust} />
           </td>
         </tr>
@@ -110,7 +143,7 @@ export function ReportRow({
 
 function AdjustPanel({ date, adjust }: { date: string; adjust: AdjustData }) {
   return (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="grid gap-6 md:grid-cols-3">
       <div>
         <h3 className="mb-2 text-sm font-semibold">Batidas do dia</h3>
         {adjust.punches.length === 0 ? (
@@ -136,8 +169,85 @@ function AdjustPanel({ date, adjust }: { date: string; adjust: AdjustData }) {
       </div>
       <div>
         <h3 className="mb-2 text-sm font-semibold">Lançar batida esquecida</h3>
-        <AddSection userId={adjust.userId} date={date} missing={adjust.missing} />
+        {adjust.isFuture ? (
+          <p className="text-sm text-slate-500">Não dá para lançar batida em um dia futuro.</p>
+        ) : (
+          <AddSection userId={adjust.userId} date={date} missing={adjust.missing} />
+        )}
       </div>
+      <div>
+        <h3 className="mb-2 text-sm font-semibold">Abono do dia</h3>
+        <DayOffSection userId={adjust.userId} date={date} dayOff={adjust.dayOff} />
+      </div>
+    </div>
+  );
+}
+
+function DayOffSection({
+  userId,
+  date,
+  dayOff,
+}: {
+  userId: string;
+  date: string;
+  dayOff: AdjustData["dayOff"];
+}) {
+  // Um estado só para lançar e remover: a mensagem continua visível quando o formulário troca.
+  const [state, action] = useActionState(
+    async (prev: Awaited<ReturnType<typeof addDayOffAction>>, formData: FormData) =>
+      formData.has("dayOffId")
+        ? removeDayOffAction(prev, formData)
+        : addDayOffAction(prev, formData),
+    undefined,
+  );
+
+  return (
+    <div className="space-y-3">
+      <FormMessage state={state} />
+      {dayOff ? (
+        <form action={action} className="space-y-2 rounded-lg border border-slate-200 bg-white p-3 text-sm">
+          <input type="hidden" name="dayOffId" value={dayOff.id} />
+          <p className="font-medium">{dayOff.label}</p>
+          <p className="text-xs text-slate-500">Motivo: {dayOff.reason}</p>
+          {dayOff.period && (
+            <p className="text-xs text-amber-700">
+              Período de {dayOff.period}. Remover tira o abono do período inteiro.
+            </p>
+          )}
+          <SubmitButton variant="danger" pendingText="..." className="px-3 py-1.5">
+            Remover abono
+          </SubmitButton>
+        </form>
+      ) : (
+        // onReset: um erro do servidor não apaga o que foi digitado.
+        <form action={action} onReset={(e) => e.preventDefault()} className="space-y-3">
+          <input type="hidden" name="userId" value={userId} />
+          <input type="hidden" name="startDate" value={date} />
+          <select name="kind" required aria-label="Tipo do abono" className={`${inputClass} py-2 text-sm`}>
+            <option value="HOLIDAY">Feriado ou folga</option>
+            <option value="EXCUSED">Atestado ou abono</option>
+          </select>
+          <label className="block text-xs text-slate-500">
+            Até (opcional, para férias ou vários dias)
+            <input
+              type="date"
+              name="endDate"
+              min={date}
+              className={`${inputClass} mt-1 py-2 text-sm`}
+            />
+          </label>
+          <input
+            name="reason"
+            required
+            minLength={3}
+            maxLength={200}
+            placeholder="Motivo (ex.: feriado, atestado)"
+            aria-label="Motivo do abono"
+            className={`${inputClass} py-2 text-sm`}
+          />
+          <SubmitButton pendingText="Lançando...">Abonar</SubmitButton>
+        </form>
+      )}
     </div>
   );
 }

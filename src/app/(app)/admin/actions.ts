@@ -7,12 +7,14 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { FormState } from "@/components/form-message";
 import { db } from "@/db";
-import { punches, users, type PunchType } from "@/db/schema";
+import { punches, users, workSchedules, type PunchType } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { validatePassword } from "@/lib/password";
 import { PUNCH_LABEL, PUNCH_ORDER, isPunchType } from "@/lib/punches";
-import { minuteOf, zonedToUtc } from "@/lib/time";
+import { parseScheduleForm } from "@/lib/schedule";
+import { minuteOf, workDateOf, zonedToUtc } from "@/lib/time";
+import { validFromSchema } from "@/lib/validation";
 
 const nameSchema = z.string().trim().min(2, "Informe o nome.").max(80, "Nome longo demais.");
 
@@ -36,29 +38,46 @@ export async function createEmployeeAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireAdmin();
+  const admin = await requireAdmin();
 
   const parsed = z
     .object({
       name: nameSchema,
       username: usernameSchema,
       password: passwordSchema,
+      validFrom: validFromSchema,
     })
     .safeParse({
       name: formData.get("name"),
       username: formData.get("username"),
       password: formData.get("password"),
+      validFrom: formData.get("validFrom"),
     });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const passwordProblem = validatePassword(parsed.data.password, parsed.data.username);
   if (passwordProblem) return { error: passwordProblem };
+  const schedule = parseScheduleForm(formData);
+  if ("error" in schedule) return { error: schedule.error };
 
   try {
-    await db.insert(users).values({
-      name: parsed.data.name,
-      username: parsed.data.username,
-      passwordHash: await bcrypt.hash(parsed.data.password, 10),
-      role: "EMPLOYEE",
+    const passwordHash = await bcrypt.hash(parsed.data.password, 10);
+    // Funcionário e jornada são gravados juntos: ou os dois, ou nenhum.
+    await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(users)
+        .values({
+          name: parsed.data.name,
+          username: parsed.data.username,
+          passwordHash,
+          role: "EMPLOYEE",
+        })
+        .returning({ id: users.id });
+      await tx.insert(workSchedules).values({
+        userId: created.id,
+        validFrom: parsed.data.validFrom,
+        days: schedule.week,
+        createdById: admin.id,
+      });
     });
   } catch (e) {
     if (isUniqueViolation(e)) {
@@ -90,7 +109,15 @@ export async function updateEmployeeAction(
   try {
     const updated = await db
       .update(users)
-      .set({ name: parsed.data.name, username: parsed.data.username, active })
+      .set({
+        name: parsed.data.name,
+        username: parsed.data.username,
+        active,
+        // Guarda o dia só na passagem de ativo para inativo (no UPDATE, `active` é o valor antigo).
+        deactivatedOn: active
+          ? null
+          : sql`case when ${users.active} then ${workDateOf(new Date())}::date else ${users.deactivatedOn} end`,
+      })
       .where(and(eq(users.id, parsed.data.id), eq(users.role, "EMPLOYEE")))
       .returning({ id: users.id });
     if (updated.length === 0) return { error: "Funcionário não encontrado." };

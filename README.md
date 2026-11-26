@@ -14,6 +14,25 @@ Sistema web para a funcionária registrar o ponto pelo celular e para a dona da 
 - **Relatórios:** espelho de ponto do mês por funcionário, com total de horas, dias incompletos, **impressão/PDF** (com linhas de assinatura) e **planilha CSV** que abre direto no Excel.
 - **Ajustes:** lançar uma batida esquecida ou anular uma errada. O motivo é obrigatório, o lançamento aparece marcado como manual no relatório, e nada é apagado do banco.
 
+## Jornada e banco de horas
+
+A funcionária sempre registra as 4 batidas. A jornada é definida no cadastro (ou em **Funcionários → Editar**), por dia da semana:
+
+- **Sem horário fixo (padrão):** só o total de horas do dia (ex.: `08:24`). Ela escolhe quando entra, almoça e sai, e o horário da loja (ex.: 09:00 às 19:00) serve de referência.
+- **Horário fixo de entrada e saída** (opcional): o total é calculado pelos horários, descontando o almoço.
+- **Horário fixo de almoço** (opcional), com ou sem entrada e saída fixas.
+
+Como o saldo é calculado:
+
+- Saldo do dia = trabalhado − previsto. Diferença de até **10 minutos** no dia não conta; acima disso conta **inteira** (`TOLERANCE_MINUTES` em `src/lib/schedule.ts`).
+- Dia de trabalho passado sem batida é **Falta**. Dia de hoje, dias futuros e dias com batida faltando (**Incompleto**) ficam fora do saldo.
+- Avisos que não mexem no saldo: **Atraso** (na entrada ou na volta do almoço, quando o horário é fixo) e **Fora do horário da loja**. O sistema não bloqueia a batida.
+- **Abono** (botão *Ajustar* no relatório), por dia ou período: *Feriado ou folga* não exige trabalho, e o que for trabalhado vira hora extra. *Atestado ou abono* nunca gera débito.
+- O saldo **acumula** desde a data de início da jornada. Cada alteração de jornada vale a partir da data informada, sem mudar o cálculo dos dias anteriores.
+- Funcionário desativado para de acumular na data da desativação. Se for reativado, lance um abono para o período em que esteve fora.
+
+Banco de horas tem regras trabalhistas próprias (acordo por escrito e prazo para compensar). Confirme com o contador antes de usar o saldo para pagar ou descontar.
+
 ## Stack
 
 Next.js 16 (App Router) + TypeScript + Tailwind 4 + PostgreSQL + Drizzle ORM. O login usa cookie assinado (`jose`) e senhas com `bcryptjs`.
@@ -66,7 +85,8 @@ O controle de ponto é obrigatório para estabelecimentos com **mais de 20 funci
 ## Mapa do código
 
 ```
-src/db/schema.ts            tabelas: users e punches (e o índice único das batidas)
+src/db/schema.ts            tabelas: users, punches, work_schedules, day_offs, login_attempts
+src/lib/schedule.ts         regras da jornada e do banco de horas
 src/lib/time.ts             tudo que mexe com data/hora no fuso de São Paulo
 src/lib/punches.ts          ordem das 4 batidas, próximo tipo, cálculo de horas trabalhadas
 src/lib/report.ts           monta o relatório do mês (uma linha por dia)
@@ -80,7 +100,7 @@ drizzle/                    migrations SQL
 
 ## Ideias para depois
 
-- Banco de horas e horas extras (hoje o relatório soma o trabalhado, sem comparar com a jornada contratada).
+- Registrar o pagamento de horas extras (baixa no saldo do banco).
 - Restringir a batida à rede wi-fi ou à localização da loja.
-- Feriados e escala (dias que a funcionária não precisa vir).
+- Feriado lançado de uma vez para todos os funcionários.
 - Aviso para a administradora quando alguém esquece a saída.

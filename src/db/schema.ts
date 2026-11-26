@@ -4,6 +4,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -24,6 +25,30 @@ export const punchTypeEnum = pgEnum("punch_type", [
 
 export const punchSourceEnum = pgEnum("punch_source", ["CLOCK", "MANUAL"]);
 
+// HOLIDAY: feriado ou folga (não se espera trabalho; o que for trabalhado vira hora extra).
+// EXCUSED: atestado ou abono (nunca gera débito; só vira extra o que passar da jornada normal).
+export const dayOffKindEnum = pgEnum("day_off_kind", ["HOLIDAY", "EXCUSED"]);
+
+/** Jornada de um dia da semana. Horários no formato "09:00"; null = não é fixo. */
+export type DaySchedule = {
+  /** Minutos que a pessoa precisa trabalhar no dia (sem o almoço). É o que vale no banco de horas. */
+  minutes: number;
+  /** Entrada e saída fixas (opcional). */
+  start: string | null;
+  end: string | null;
+  /** Almoço em horário fixo (opcional). */
+  lunchStart: string | null;
+  lunchEnd: string | null;
+  /** Minutos de almoço considerados na conta; null quando o almoço é livre e só o total importa. */
+  lunch: number | null;
+  /** Horário da loja, em dia de entrada e saída livres: fora dele o relatório avisa. */
+  open: string | null;
+  close: string | null;
+};
+
+/** Chave: dia da semana, "0" (domingo) a "6" (sábado). Dia ausente = não trabalha. */
+export type WeekSchedule = Partial<Record<string, DaySchedule>>;
+
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
@@ -34,6 +59,8 @@ export const users = pgTable("users", {
   // Vai dentro do cookie de login. Quando a senha muda, o número sobe e todos os
   // cookies emitidos antes deixam de valer (sessões antigas são derrubadas).
   sessionVersion: integer("session_version").notNull().default(0),
+  // Dia em que foi desativado: a partir dele o banco de horas para de contar faltas.
+  deactivatedOn: date("deactivated_on", { mode: "string" }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -82,6 +109,52 @@ export const punches = pgTable(
   ],
 );
 
+// Jornada contratada, versionada: cada linha vale a partir de `validFrom`. Mudar a jornada
+// cria uma linha nova, então os meses anteriores continuam calculados pela jornada antiga.
+export const workSchedules = pgTable(
+  "work_schedules",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    validFrom: date("valid_from", { mode: "string" }).notNull(),
+    days: jsonb("days").$type<WeekSchedule>().notNull(),
+    createdById: uuid("created_by_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // Nada é apagado: uma jornada lançada errado é marcada como removida.
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+    removedById: uuid("removed_by_id"),
+  },
+  (t) => [index("work_schedules_user_idx").on(t.userId, t.validFrom)],
+);
+
+// Feriados, folgas, atestados e férias. Um dia só é um período com início = fim.
+export const dayOffs = pgTable(
+  "day_offs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    startDate: date("start_date", { mode: "string" }).notNull(),
+    endDate: date("end_date", { mode: "string" }).notNull(),
+    kind: dayOffKindEnum("kind").notNull(),
+    reason: text("reason").notNull(),
+    createdById: uuid("created_by_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+    removedById: uuid("removed_by_id"),
+  },
+  (t) => [index("day_offs_user_idx").on(t.userId, t.startDate)],
+);
+
+export type DayOff = typeof dayOffs.$inferSelect;
+export type DayOffKind = (typeof dayOffKindEnum.enumValues)[number];
 export type User = typeof users.$inferSelect;
 export type Punch = typeof punches.$inferSelect;
 export type PunchType = (typeof punchTypeEnum.enumValues)[number];

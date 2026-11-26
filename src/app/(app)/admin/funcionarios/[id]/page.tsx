@@ -6,7 +6,11 @@ import { cardClass } from "@/components/ui";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
+import { describeWeek, versionFor } from "@/lib/schedule";
+import { getScheduleVersions } from "@/lib/schedule-data";
+import { formatDateBR, workDateOf } from "@/lib/time";
 import { EditEmployeeForm, ResetPasswordForm } from "../../employee-forms";
+import { ScheduleHistory, SetScheduleForm } from "../../schedule-forms";
 
 export default async function EditEmployeePage({
   params,
@@ -29,6 +33,18 @@ export default async function EditEmployeePage({
     .limit(1);
   if (!employee) notFound();
 
+  const today = workDateOf(new Date());
+  const versions = await getScheduleVersions(employee.id);
+  const current = versionFor(versions, today);
+  // O formulário já vem preenchido com a jornada de hoje (ou a próxima agendada).
+  const initial = (current ?? versions.at(-1))?.days;
+  const history = [...versions].reverse().map((v) => ({
+    id: v.id,
+    validFrom: formatDateBR(v.validFrom),
+    current: v.id === current?.id,
+    lines: describeWeek(v.days),
+  }));
+
   return (
     <div className="mx-auto max-w-md space-y-4">
       <div>
@@ -46,6 +62,24 @@ export default async function EditEmployeePage({
       <div className={cardClass}>
         <h2 className="mb-4 font-semibold">Dados</h2>
         <EditEmployeeForm employee={employee} />
+      </div>
+      <div className={`${cardClass} space-y-4`}>
+        <h2 className="font-semibold">Jornada e banco de horas</h2>
+        <ScheduleHistory items={history} />
+        <details open={versions.length === 0}>
+          <summary className="cursor-pointer text-sm font-semibold text-emerald-800">
+            {versions.length === 0 ? "Cadastrar jornada" : "Alterar jornada"}
+          </summary>
+          <div className="mt-4">
+            {/* key: depois de salvar, o formulário recomeça com a jornada nova */}
+            <SetScheduleForm
+              key={versions.map((v) => v.id).join()}
+              userId={employee.id}
+              initial={initial}
+              today={today}
+            />
+          </div>
+        </details>
       </div>
       <div className={cardClass}>
         <h2 className="mb-4 font-semibold">Redefinir senha</h2>

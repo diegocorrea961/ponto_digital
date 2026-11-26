@@ -15,6 +15,13 @@
       "when": 1795715889603,
       "tag": "0001_seguranca",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795718237200,
+      "tag": "0002_banco_de_horas",
+      "breakpoints": true
     }
   ]
 }
