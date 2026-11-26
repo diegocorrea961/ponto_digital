@@ -18,11 +18,13 @@ async function main() {
   const password = process.env.ADMIN_PASSWORD;
   const name = process.env.ADMIN_NAME ?? "Administradora";
 
-  if (!password || password.length < 8) {
-    throw new Error(
-      "Defina ADMIN_PASSWORD (mínimo 8 caracteres) para criar o administrador.",
-    );
+  if (!password) {
+    throw new Error("Defina ADMIN_PASSWORD para criar o administrador.");
   }
+  // Mesma regra de senha do sistema (tamanho mínimo, senhas comuns, usuário dentro da senha).
+  const { validatePassword } = await import("../src/lib/password");
+  const problem = validatePassword(password, username);
+  if (problem) throw new Error(`ADMIN_PASSWORD recusada: ${problem}`);
 
   const [existing] = await db
     .select({ id: users.id })

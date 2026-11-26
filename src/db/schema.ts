@@ -3,6 +3,7 @@ import {
   boolean,
   date,
   index,
+  integer,
   pgEnum,
   pgTable,
   text,
@@ -30,9 +31,21 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   role: roleEnum("role").notNull().default("EMPLOYEE"),
   active: boolean("active").notNull().default(true),
+  // Vai dentro do cookie de login. Quando a senha muda, o número sobe e todos os
+  // cookies emitidos antes deixam de valer (sessões antigas são derrubadas).
+  sessionVersion: integer("session_version").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+});
+
+// Tentativas de login erradas, guardadas no banco para o bloqueio valer mesmo
+// com várias instâncias do servidor e depois de reinícios.
+// A chave é "u:<usuário>" (limite por conta) ou "ip:<endereço>" (limite por origem).
+export const loginAttempts = pgTable("login_attempts", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull().default(0),
+  resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
 });
 
 export const punches = pgTable(

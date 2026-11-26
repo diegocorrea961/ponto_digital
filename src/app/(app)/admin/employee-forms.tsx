@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { FormMessage } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
 import { inputClass, labelClass } from "@/components/ui";
+import { PASSWORD_MIN } from "@/lib/password";
 import {
   createEmployeeAction,
   resetPasswordAction,
@@ -47,12 +48,13 @@ export function CreateEmployeeForm() {
           name="password"
           type="text"
           required
-          minLength={6}
+          minLength={PASSWORD_MIN}
           autoComplete="off"
           className={inputClass}
         />
         <p className="mt-1 text-xs text-slate-500">
-          Mínimo 6 caracteres. Passe para o funcionário; ele pode trocar depois em &quot;Minha conta&quot;.
+          Mínimo {PASSWORD_MIN} caracteres, sem ser uma senha óbvia (como 1234567890) nem conter o usuário.
+          Passe para o funcionário; ele pode trocar depois em &quot;Minha conta&quot;.
         </p>
       </div>
       <FormMessage state={state} />
@@ -134,7 +136,7 @@ export function ResetPasswordForm({ id }: { id: string }) {
           name="password"
           type="text"
           required
-          minLength={6}
+          minLength={PASSWORD_MIN}
           autoComplete="off"
           className={inputClass}
         />

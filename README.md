@@ -41,6 +41,7 @@ O sistema precisa ficar num endereço com **HTTPS** (o cookie de login só é en
 2. Suba o projeto para um repositório no GitHub e importe na [Vercel](https://vercel.com).
 3. Na Vercel, defina as variáveis de ambiente: `DATABASE_URL`, `SESSION_SECRET` (gere com `openssl rand -base64 48`) e `STORE_NAME`.
 4. No seu computador, com `DATABASE_URL` apontando para o banco de produção (e `ADMIN_PASSWORD` definida), rode uma vez `npm run db:migrate` e `npm run db:seed`.
+   **Em toda atualização que traga uma migration nova** (pasta `drizzle/`), rode `npm run db:migrate` contra o banco de produção **antes** de publicar o código novo. O código novo lê colunas e tabelas que só existem depois da migration, e sem ela o login quebra.
 5. Abra o endereço da Vercel no celular da funcionária e use **Adicionar à tela inicial** para ficar como um aplicativo.
 
 Não testei a publicação em nenhum provedor. Só rodei o sistema localmente, com testes de ponta a ponta em navegador.
@@ -52,10 +53,15 @@ O controle de ponto é obrigatório para estabelecimentos com **mais de 20 funci
 ## Segurança, em resumo
 
 - Senhas guardadas com bcrypt; sessão de 12 horas em cookie `httpOnly`.
+- Regra de senha (`src/lib/password.ts`): mínimo de 10 caracteres, sem senhas óbvias (como `1234567890`), sem conter o nome de usuário. Vale para cadastro, redefinição, troca e para o `db:seed`.
+- Redefinir ou trocar a senha derruba as sessões abertas (`users.session_version` vai dentro do cookie e é conferido a cada requisição). Quem trocou a própria senha continua logado no aparelho em uso.
+- Bloqueio de 15 minutos depois de 10 senhas erradas para o mesmo usuário (de qualquer IP) ou 20 erradas vindas do mesmo IP. Os contadores ficam no banco (`login_attempts`), então valem com várias instâncias e sobrevivem a reinícios. Efeito colateral: quem souber o usuário pode travar o login dele por 15 minutos.
+- O IP vem do `x-forwarded-for`, que na Vercel é preenchido pela plataforma. Em outro host, só funciona direito com um proxy seu na frente sobrescrevendo esse cabeçalho.
+- Cabeçalhos de segurança (`next.config.ts`): CSP, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy` e HSTS (só em produção). O CSP usa `'unsafe-inline'` em scripts e estilos porque o Next injeta código inline para hidratar a página.
 - Toda página e toda ação do painel conferem se o usuário é administrador no servidor.
 - Funcionário desativado perde o acesso na hora, mesmo logado.
-- Bloqueio de 15 minutos depois de 6 senhas erradas (o contador fica na memória do servidor, então reinicia quando ele reinicia).
 - O banco impede duas batidas ativas do mesmo tipo no mesmo dia (índice único), o que protege contra toque duplo e duas abas abertas.
+- Sair (logout) apaga o cookie do aparelho, mas não invalida o cookie em si: ele vale até expirar (12 h) ou até a senha mudar.
 
 ## Mapa do código
 

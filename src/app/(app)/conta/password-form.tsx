@@ -5,6 +5,7 @@ import { changePasswordAction } from "@/app/actions/auth";
 import { FormMessage } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
 import { inputClass, labelClass } from "@/components/ui";
+import { PASSWORD_MIN } from "@/lib/password";
 
 export function PasswordForm() {
   const [state, action] = useActionState(changePasswordAction, undefined);
@@ -32,10 +33,13 @@ export function PasswordForm() {
           name="next"
           type="password"
           autoComplete="new-password"
-          minLength={6}
+          minLength={PASSWORD_MIN}
           required
           className={inputClass}
         />
+        <p className="mt-1 text-xs text-slate-500">
+          Mínimo {PASSWORD_MIN} caracteres. Evite senhas óbvias e não use seu nome de usuário.
+        </p>
       </div>
       <div>
         <label htmlFor="confirm" className={labelClass}>
@@ -46,7 +50,7 @@ export function PasswordForm() {
           name="confirm"
           type="password"
           autoComplete="new-password"
-          minLength={6}
+          minLength={PASSWORD_MIN}
           required
           className={inputClass}
         />

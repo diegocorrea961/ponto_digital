@@ -1,7 +1,7 @@
 "use server";
 
 import bcrypt from "bcryptjs";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -10,6 +10,7 @@ import { db } from "@/db";
 import { punches, users, type PunchType } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
 import { isUniqueViolation } from "@/lib/db-errors";
+import { validatePassword } from "@/lib/password";
 import { PUNCH_LABEL, PUNCH_ORDER, isPunchType } from "@/lib/punches";
 import { minuteOf, zonedToUtc } from "@/lib/time";
 
@@ -24,10 +25,8 @@ const usernameSchema = z
     "Usuário: de 3 a 30 caracteres, só letras minúsculas sem acento, números, ponto, hífen ou sublinhado (sem espaços).",
   );
 
-const passwordSchema = z
-  .string()
-  .min(6, "A senha precisa ter pelo menos 6 caracteres.")
-  .max(72, "A senha é longa demais (máximo 72 caracteres).");
+// A regra de senha (tamanho, senhas comuns, usuário dentro da senha) fica em @/lib/password.
+const passwordSchema = z.string();
 
 const idSchema = z.string().uuid();
 
@@ -51,6 +50,8 @@ export async function createEmployeeAction(
       password: formData.get("password"),
     });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const passwordProblem = validatePassword(parsed.data.password, parsed.data.username);
+  if (passwordProblem) return { error: passwordProblem };
 
   try {
     await db.insert(users).values({
@@ -115,14 +116,29 @@ export async function resetPasswordAction(
     .safeParse({ id: formData.get("id"), password: formData.get("password") });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const updated = await db
-    .update(users)
-    .set({ passwordHash: await bcrypt.hash(parsed.data.password, 10) })
+  const [employee] = await db
+    .select({ username: users.username })
+    .from(users)
     .where(and(eq(users.id, parsed.data.id), eq(users.role, "EMPLOYEE")))
-    .returning({ id: users.id });
-  if (updated.length === 0) return { error: "Funcionário não encontrado." };
+    .limit(1);
+  if (!employee) return { error: "Funcionário não encontrado." };
 
-  return { success: "Senha redefinida. Avise o funcionário da nova senha." };
+  const passwordProblem = validatePassword(parsed.data.password, employee.username);
+  if (passwordProblem) return { error: passwordProblem };
+
+  // Sobe a versão da sessão: quem estiver logado com a senha antiga é desconectado.
+  await db
+    .update(users)
+    .set({
+      passwordHash: await bcrypt.hash(parsed.data.password, 10),
+      sessionVersion: sql`${users.sessionVersion} + 1`,
+    })
+    .where(eq(users.id, parsed.data.id));
+
+  return {
+    success:
+      "Senha redefinida e o funcionário foi desconectado dos aparelhos. Avise a nova senha a ele.",
+  };
 }
 
 // ---------- Ajustes de batidas ----------

@@ -12,8 +12,9 @@ function secretKey() {
   return new TextEncoder().encode(secret);
 }
 
-export async function createSession(userId: string) {
-  const token = await new SignJWT({})
+/** `version` é o users.session_version atual: se ele subir no banco, este cookie deixa de valer. */
+export async function createSession(userId: string, version: number) {
+  const token = await new SignJWT({ ver: version })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(userId)
     .setIssuedAt()
@@ -29,15 +30,20 @@ export async function createSession(userId: string) {
   });
 }
 
-/** Devolve o id do usuário da sessão, ou null se não houver sessão válida. */
-export async function readSession(): Promise<string | null> {
+/**
+ * Devolve o id e a versão da sessão, ou null se não houver sessão válida (assinatura/validade).
+ * Cookies emitidos antes da existência da versão não têm o campo `ver` e contam como 0.
+ */
+export async function readSession(): Promise<{ id: string; version: number } | null> {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secretKey(), {
       algorithms: ["HS256"],
     });
-    return payload.sub ?? null;
+    if (!payload.sub) return null;
+    const version = typeof payload.ver === "number" ? payload.ver : 0;
+    return { id: payload.sub, version };
   } catch {
     return null;
   }

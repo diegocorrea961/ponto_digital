@@ -8,7 +8,9 @@ services:
       POSTGRES_PASSWORD: ponto
       POSTGRES_DB: ponto
     ports:
-      - "5432:5432"
+      # Só a própria máquina acessa o banco. Sem o 127.0.0.1, no Windows/Docker Desktop a porta
+      # abriria para toda a rede (wi-fi), e a senha deste banco de desenvolvimento é "ponto".
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
