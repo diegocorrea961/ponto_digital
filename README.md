@@ -25,7 +25,8 @@ A funcionária sempre registra as 4 batidas. A jornada é definida no cadastro (
 Como o saldo é calculado:
 
 - Saldo do dia = trabalhado − previsto. Diferença de até **10 minutos** no dia não conta; acima disso conta **inteira** (`TOLERANCE_MINUTES` em `src/lib/schedule.ts`).
-- Dia de trabalho passado sem batida é **Falta**. Dia de hoje, dias futuros e dias com batida faltando (**Incompleto**) ficam fora do saldo.
+- Dia de trabalho passado sem batida é **Falta**. O dia de hoje entra no saldo assim que as 4 batidas são registradas. Dias futuros e dias com batida faltando (**Incompleto**) ficam fora do saldo.
+- Quando o saldo acumulado é negativo, o relatório (da administradora e da funcionária) destaca as **Horas pendentes para pagar**. Elas são abatidas automaticamente pelas horas extras de outros dias.
 - Avisos que não mexem no saldo: **Atraso** (na entrada ou na volta do almoço, quando o horário é fixo) e **Fora do horário da loja**. O sistema não bloqueia a batida.
 - **Abono** (botão *Ajustar* no relatório), por dia ou período: *Feriado ou folga* não exige trabalho, e o que for trabalhado vira hora extra. *Atestado ou abono* nunca gera débito.
 - O saldo **acumula** desde a data de início da jornada. Cada alteração de jornada vale a partir da data informada, sem mudar o cálculo dos dias anteriores.

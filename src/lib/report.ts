@@ -165,7 +165,7 @@ export async function getMonthReport(
   if (since !== null && since <= month.last) {
     let previous = 0;
     let pendingPrevious = 0;
-    for (let date = since; date < month.first && date < today; date = addDays(date, 1)) {
+    for (let date = since; date < month.first && date <= today; date = addDays(date, 1)) {
       const row = buildRow(date);
       previous += row.balance ?? 0;
       if (row.pending) pendingPrevious++;

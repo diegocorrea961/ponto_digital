@@ -93,8 +93,9 @@ export async function GET(req: NextRequest) {
     lines.push(["Saldo anterior", saldo(bank.previous)]);
     lines.push(["Saldo do mês", saldo(bank.month)]);
     lines.push(["Saldo acumulado", saldo(bank.accumulated)]);
+    lines.push(["Horas pendentes para pagar", formatDuration(Math.max(0, -bank.accumulated))]);
     lines.push(["Faltas no mês", String(bank.absences)]);
-    lines.push(["Dias pendentes (fora do saldo)", String(bank.pendingMonth + bank.pendingPrevious)]);
+    lines.push(["Dias incompletos (fora do saldo)", String(bank.pendingMonth + bank.pendingPrevious)]);
   }
 
   // BOM + ponto e vírgula: o Excel em português abre direito, com acentos.

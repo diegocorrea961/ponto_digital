@@ -126,7 +126,7 @@ export function MonthTable({
 function bankCells(r: DayRow): NonNullable<RowData["bank"]> {
   const expected = r.expected ? formatDuration(r.expected) : r.expected === 0 ? "—" : "";
   if (r.balance === null) {
-    return { expected, balance: r.pending ? "pendente" : "", tone: "zero" };
+    return { expected, balance: r.pending ? "a ajustar" : "", tone: "zero" };
   }
   // Dia sem previsão e sem saldo não precisa mostrar "0h00".
   const quiet = r.balance === 0 && !r.expected && !r.hasPunches;

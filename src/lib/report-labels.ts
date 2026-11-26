@@ -1,6 +1,7 @@
 // Avisos de cada dia, usados pela tabela da tela/impressão e pela planilha CSV.
 import type { DayRow } from "./report";
 import { DAY_OFF_LABEL } from "./schedule";
+import { formatDuration } from "./time";
 
 export type DayBadge = { text: string; tone: "warn" | "bad" | "info" };
 
@@ -14,6 +15,10 @@ export function dayBadges(row: DayRow, today: string): DayBadge[] {
     badges.push({ text: "Incompleto", tone: "warn" });
   }
   if (row.absent) badges.push({ text: "Falta", tone: "bad" });
+  // Dia trabalhado que ficou abaixo da jornada (a falta do dia inteiro já tem o aviso acima).
+  if (!row.absent && row.balance !== null && row.balance < 0) {
+    badges.push({ text: `Horas pendentes: ${formatDuration(-row.balance)}`, tone: "bad" });
+  }
   if (row.lateEntry) badges.push({ text: `Atraso na entrada: ${row.lateEntry} min`, tone: "warn" });
   if (row.lateLunch) {
     badges.push({ text: `Atraso na volta do almoço: ${row.lateLunch} min`, tone: "warn" });

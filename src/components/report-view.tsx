@@ -62,7 +62,7 @@ export function ReportView({
         intervalo do almoço.
         {totals.manualPunches > 0 && ` Neste mês: ${totals.manualPunches} lançamento(s) manual(is).`}
         {bank &&
-          ` Banco de horas desde ${formatDateBR(bank.since)}: diferenças de até ${TOLERANCE_MINUTES} minutos no dia não contam; o dia de hoje e dias com batida faltando ficam fora do saldo.`}
+          ` Banco de horas desde ${formatDateBR(bank.since)}: diferenças de até ${TOLERANCE_MINUTES} minutos no dia não contam; o dia de hoje entra depois da saída, e dias com batida faltando ficam fora do saldo.`}
       </p>
 
       <div className="hidden grid-cols-2 gap-10 pt-16 text-center text-xs print:grid">
@@ -77,6 +77,20 @@ function BankPanel({ bank }: { bank: BankSummary }) {
   const pending = bank.pendingMonth + bank.pendingPrevious;
   return (
     <section aria-label="Banco de horas" className="space-y-2">
+      {bank.accumulated < 0 && (
+        <div
+          role="status"
+          className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-800 print:rounded-none print:bg-transparent print:px-1 print:py-1"
+        >
+          <p className="text-lg font-semibold print:text-sm">
+            Horas pendentes para pagar: {formatDuration(-bank.accumulated)}
+          </p>
+          <p className="text-sm print:text-xs">
+            Já descontadas as horas extras feitas. Ao trabalhar mais de {TOLERANCE_MINUTES}{" "}
+            minutos além da jornada em um dia, esse valor diminui sozinho.
+          </p>
+        </div>
+      )}
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 print:grid-cols-4 print:gap-1">
         <Stat label="Saldo anterior" value={formatBalance(bank.previous)} />
         <Stat label="Saldo do mês" value={formatBalance(bank.month)} />

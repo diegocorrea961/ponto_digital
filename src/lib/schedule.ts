@@ -297,8 +297,9 @@ export function evaluateDay(args: {
     );
   }
 
-  // Hoje ainda está em andamento e o futuro não aconteceu: sem saldo.
-  if (date >= today) return result;
+  // O futuro não aconteceu, e hoje só entra no saldo depois das 4 batidas (até a saída o dia
+  // está em andamento: não é falta nem incompleto).
+  if (date > today || (date === today && !complete)) return result;
 
   if (dayOff === "EXCUSED") {
     // Nunca gera débito. Só vira extra o que passar da jornada normal do dia.
